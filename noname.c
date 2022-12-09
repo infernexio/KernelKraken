@@ -1,9 +1,9 @@
-#include <linux/init.h>             //must have to make a kernal m$
-#include <linux/module.h>           //must have to make a kernal m$
+#include <linux/init.h>             //must have to make a kernal module
+#include <linux/module.h>           //must have to make a kernal module
 #include <linux/kernel.h>           //to ger kernal methods
 #include <linux/syscalls.h>         // to get syscalltable
-#include <linux/kallsyms.h>         //also to get acces to kallsys$
-#include <linux/kprobes.h>          //work around for kernal 5.6.0$
+#include <linux/kallsyms.h>         //also to get acces to kallsysm_lookup_name
+#include <linux/kprobes.h>          //work around for kernal 5.6.0 and above
 #include <linux/unistd.h>           // contains syscall numbers
 #include <linux/version.h>         // linux/ kernel versions 
 
@@ -50,7 +50,7 @@ static unsigned long *get_syscall_table(void){
     unsigned long *syscall_table = NULL;
 
     #if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
-        syscall_table = (unsigned long*)kallsyms_lookup_name("sys_$
+        syscall_table = (unsigned long*)kallsyms_lookup_name("sys_call_table");
     #endif
 
         return syscall_table;
@@ -80,4 +80,3 @@ static void __exit exit_func(void){
 */
 module_init(init_func);
 module_exit(exit_func);
-
