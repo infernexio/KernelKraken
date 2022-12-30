@@ -469,12 +469,12 @@ static unsigned long *get_syscall_table(void){
 
 #if LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0)
         syscall_table = (unsigned long*)kallsyms_lookup_name("sys_call_table");
-    #else
+#else
         syscall_table = NULL;
-    #endif
+#endif
 
 	//printk(KERN_INFO "syscaltable value: %ln",syscall_table);
-        return syscall_table;
+    return syscall_table;
 }
 
 /**
