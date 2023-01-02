@@ -26,7 +26,7 @@
  * so we have to use kprobes to get the address.
  * Full credit to @f0lg0 for the idea.
  */
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,7,0)
+#if LINUX_VERSION_CODE > KERNEL_VERSION(5,6,0)
 #define KPROBE_LOOKUP 1
 #include <linux/kprobes.h>
 static struct kprobe kp = {
