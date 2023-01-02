@@ -14,6 +14,13 @@
 #define PTREGS_SYSCALL_STUBS 1
 #endif
 
+/* x64 has to be special and require a different naming convention */
+#ifdef PTREGS_SYSCALL_STUBS
+#define SYSCALL_NAME(name) ("__x64_" name)
+#else
+#define SYSCALL_NAME(name) (name)
+#endif
+
 /*
  * On Linux kernels 5.7+, kallsyms_lookup_name() is no longer exported, 
  * so we have to use kprobes to get the address.
