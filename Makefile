@@ -8,15 +8,15 @@ clean:
 
 test:
 	sudo dmesg -C
-	sudo insmod popcorn.ko
-	sudo lsmod | grep popcorn
-	sudo rmmod popcorn.ko
+	sudo insmod KernalKraken.ko
+	sudo lsmod | grep KernalKraken
+	sudo rmmod KernalKraken.ko
 	dmesg
 
 install:
 	sudo dmesg -C
-	sudo insmod popcorn.ko
+	sudo insmod KernalKraken.ko
 
 purge:
-	sudo rmmod popcorn.ko
+	sudo rmmod KernalKraken.ko
 	dmesg
