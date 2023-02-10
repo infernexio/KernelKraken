@@ -1,9 +1,22 @@
-obj-m := noname.o
-CC = gcc -Wall
-KDIR := /lib/modules/$(shell uname -r)/build
-PWD := $(shell pwd)
+obj-m := KernalKraken.o
+
 all:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) modules
 
 clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
+	make -C /lib/modules/$(shell uname -r)/build M=$(PWD) clean
+
+test:
+	sudo dmesg -C
+	sudo insmod popcorn.ko
+	sudo lsmod | grep popcorn
+	sudo rmmod popcorn.ko
+	dmesg
+
+install:
+	sudo dmesg -C
+	sudo insmod popcorn.ko
+
+purge:
+	sudo rmmod popcorn.ko
+	dmesg
