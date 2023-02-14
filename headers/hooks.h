@@ -2,7 +2,6 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/dirent.h>	        //contains dirent structs etc
-l
 
 #define PREFIX "SOHAIL"
 
