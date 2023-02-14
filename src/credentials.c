@@ -1,12 +1,10 @@
-#include <linux/kernel.h>
-#include <linux/module.h>
-#include <linux/cred.h>
+#include "../headers/credentials.h"
 
-void set_root(void){
+void set_root(void) {
     struct cred *root;
     root = prepare_creds();
-
     if( root == NULL){
+        printk(KERN_INFO "Unable to prepare credentials...\n");
         return;
     }
 
