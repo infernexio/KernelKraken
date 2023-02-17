@@ -1,1 +1,0 @@
-cmd_/home/vagrant/KernalKraken/KernalKraken.ko := ld -r -m elf_x86_64  -z max-page-size=0x200000 -z noexecstack   --build-id  -T ./scripts/module-common.lds -o /home/vagrant/KernalKraken/KernalKraken.ko /home/vagrant/KernalKraken/KernalKraken.o /home/vagrant/KernalKraken/KernalKraken.mod.o;  true
