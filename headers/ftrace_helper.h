@@ -4,8 +4,6 @@
  * Copyright (c) 2018 ilammy
  */
 
-#define pr_fmt(fmt) "ftrace_hook: " fmt
-
 #include <linux/ftrace.h>
 #include <linux/kallsyms.h>
 #include <linux/kernel.h>
