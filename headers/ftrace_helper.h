@@ -18,10 +18,6 @@
 
 #define DEBUGMSG 0
 
-MODULE_DESCRIPTION("Example module hooking clone() and execve() via ftrace");
-MODULE_AUTHOR("infernexio");
-MODULE_LICENSE("GPL");
-
 #if LINUX_VERSION_CODE >= KERNEL_VERSION(5,7,0)
 static unsigned long lookup_name(const char *name)
 {
@@ -251,8 +247,8 @@ void fh_remove_hooks(struct ftrace_hook *hooks, size_t count)
 #endif
 
 #define HOOK(_name, _function, _original)	\
-	{					\
-		.name = SYSCALL_NAME(_name),	\
-		.function = (_function),	\
-		.original = (_original),	\
+	{										\
+		.name = SYSCALL_NAME(_name),		\
+		.function = (_function),			\
+		.original = (_original),			\
 	}
