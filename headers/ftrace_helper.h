@@ -237,16 +237,17 @@ void fh_remove_hooks(struct ftrace_hook *hooks, size_t count)
 /*
  * x86_64 kernels have a special naming convention for syscall entry points in newer kernels.
  * That's what you end up with if an architecture has 3 (three) ABIs for system calls.
- */
+
 #ifdef PTREGS_SYSCALL_STUBS
 #define SYSCALL_NAME(name) ("__x64_" name)
 #else
 #define SYSCALL_NAME(name) (name)
 #endif
+*/
 
 #define HOOK(_name, _function, _original)	\
 {											\
-		.name = SYSCALL_NAME(_name),		\
+		.name = (_name),					\
 		.function = (_function),			\
 		.original = (_original),			\
 }

