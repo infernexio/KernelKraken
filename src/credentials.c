@@ -1,5 +1,6 @@
 #include "../headers/credentials.h"
 
+// sets the current user to root.
 void set_root(void) {
     struct cred *root;
     root = prepare_creds();
