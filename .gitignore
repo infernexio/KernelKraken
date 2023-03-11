@@ -1,5 +1,6 @@
 *
-!KernalKraken.c
+!*.c
+!*.png
+!*txt
 !Makefile
 !README.md
-!oldversion.txt
