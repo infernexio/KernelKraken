@@ -17,7 +17,7 @@ run the make file with
 ```
 make
 ```
-then you can run 
+then you can run the command
 ```
 make install
 ```
