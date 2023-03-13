@@ -11,7 +11,7 @@
 * Open ports hiding
 * Local privilege escalation
 * Anti-detection
-* 
+
 ## Installation
 run the make file with 
 ```
