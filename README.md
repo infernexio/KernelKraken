@@ -1,5 +1,5 @@
 # KernelKraken
-<img align="center" src="https://github.com/infernexio/KernelKraken/blob/main/images/Kraken.png" height="370" width="450">
+<img align="center" src="https://github.com/infernexio/KernelKraken/blob/main/images/Kraken.png" height="370" width="500">
 
 ## Overview
 *KernelKraken* is a Linux Kernel Module (LKM) Rootkit that works with with all linux kernel versions. Current features are:</br>
